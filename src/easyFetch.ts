@@ -1,150 +1,195 @@
-import { IEasyFetchOptions, IInterceptors, IRequestConfig, IResponse } from "./types";
-import { retryRequest } from "./utils";
-import { buildUrl } from './utils/build-url';
+import {
+  IEasyFetchOptions,
+  IInterceptors,
+  IRequestConfig,
+  IResponse,
+} from './types';
+import { parseBody, prepareBody, retryRequest } from './helpers';
+import { buildUrl } from './helpers/build-url';
+import {
+  RequestInterceptor,
+  ResponseSuccessInterceptor,
+  ResponseErrorInterceptor,
+} from './types/interceptors';
+import { HttpError } from './handlers/httpError';
+import { EasyFetchError } from './handlers/easyFetchError';
 
 export class EasyFetch {
+  private baseUrl?: string;
+  private httpHeaders?: HeadersInit;
+  private timeout?: number;
+  private token?: string;
 
-    private baseUrl: string;
-    private httpHeaders?: Record<string, string>;
-    private timeout?: number;
-    private token?: string;
+  public interceptors: IInterceptors;
 
-    public interceptors?: IInterceptors;
+  constructor(options: IEasyFetchOptions = {}) {
+    this.baseUrl = options.baseUrl ?? '';
+    this.httpHeaders = options.headers;
+    this.timeout = options.timeout ?? 0;
+    this.token = options.token;
 
-    constructor(options: IEasyFetchOptions = {}, interceptors?: IInterceptors) {
-        this.baseUrl = options.baseUrl ?? '';
-        this.httpHeaders = options.headers;
-        this.timeout = options.timeout ?? 0;
-        this.token = options.token;
-        this.interceptors = interceptors || {
-            request: { handlers: [], use(fn: any) { this.handlers.push(fn) } },
-            response: {
-                successHandlers: [], errorHandlers: [], use(onSuccess: any, onError?: any) {
-                    this.successHandlers.push(onSuccess);
-                    if (onError) this.errorHandlers.push(onError);
-                }
+    this.interceptors = {
+      request: {
+        handlers: [],
+        use(fn: RequestInterceptor) {
+          this.handlers.push(fn);
+          return this;
+        },
+      },
+      response: {
+        successHandlers: [],
+        errorHandlers: [
+          async (error: unknown) => {
+            if (error instanceof Error && error.name === 'AbortError') {
+              return new EasyFetchError({
+                code: 'TIMEOUT_ERROR',
+                message: 'Request timed out',
+                original: error,
+              });
             }
-        }
+
+            if (error instanceof HttpError) {
+              return new EasyFetchError({
+                code: error.code,
+                message: error.message,
+                status: error.status,
+                body: error.body,
+                original: error,
+              });
+            }
+
+            //network or unexpected error
+            return new EasyFetchError({
+              code: 'UNKNOW_ERROR',
+              message:
+                error instanceof Error
+                  ? error.message || 'Unknowm error'
+                  : 'Unknowm error',
+              original: error,
+            });
+          },
+        ],
+        use(onSuccess: ResponseSuccessInterceptor) {
+          this.successHandlers.push(onSuccess);
+          return this;
+        },
+        useError(onError: ResponseErrorInterceptor) {
+          this.errorHandlers.push(onError);
+          return this;
+        },
+      },
+    };
+  }
+
+  setIntereptors(interceptors: IInterceptors) {
+    Object.assign(this.interceptors, interceptors);
+  }
+
+  async request<T = unknown>(config: IRequestConfig): Promise<IResponse<T>> {
+    // build url with parameters
+    if (!config.url?.startsWith('http') && this.baseUrl === '') {
+      throw new Error('No baseUrl provided and relative url used');
     }
 
-    async request<T = any>(config: IRequestConfig): Promise<IResponse<T>> {
-        // base url
-        config.url = this.baseUrl + (config.url || '');
+    if (!config.url?.startsWith('http')) {
+      config.url = this.baseUrl + (config.url || '');
+    }
 
-        // headers
-        if (this.token) {
-            this.httpHeaders = {
-                "Authorization": `Bearer ${this.token}`,
-                ...this.httpHeaders
-            };
-        }
+    // meger headers
+    const headers = new Headers(config.headers || {});
 
-        if (!config.headers) {
-            config.headers = new Headers({ "Content-Type": "application/json" });
-        }
+    // global headers
+    if (this.httpHeaders) {
+      for (const [key, value] of Object.entries(this.httpHeaders)) {
+        headers.set(key, value);
+      }
+    }
 
-        if (this.httpHeaders) {
-            Object.entries(this.httpHeaders).forEach(([key, value]) => {
-                config.headers?.append(key, value);
-            })
-        }
+    // token
+    if (this.token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${this.token}`);
+    }
 
-        // add request interceptors
-        for (const interceptor of this.interceptors?.request?.handlers ?? []) {
-            config = await interceptor(config);
-        }
+    //auto JSON only if body is a plain object
+    if (
+      !headers.has('Content-Type') &&
+      config.body &&
+      typeof config.body === 'object' &&
+      !(config.body instanceof FormData)
+    ) {
+      headers.set('Content-Type', 'application/json');
+    }
 
-        // build url with parameters 
-        const finalUrl = buildUrl(config.url, config.params);
+    config.headers = headers;
 
-        // setup timeout and signal
-        const controller = new AbortController();
-        const timeoutId = config.timeout ?? this.timeout ? setTimeout(() => controller.abort(), config.timeout ?? this.timeout) : null;
+    // add request interceptors
+    for (const interceptor of this.interceptors?.request?.handlers ?? []) {
+      config = (await interceptor(config)) ?? config;
+    }
 
-        // fetching
-        const response = await retryRequest(() => fetch(finalUrl, {
+    //build url
+    const finalUrl = buildUrl(config.url ?? '', config.queryParams);
+    config.url = finalUrl;
+
+    // setup timeout and signal
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    const effectiveTimeout = config.timeout ?? this.timeout;
+
+    const timeoutId: ReturnType<typeof setTimeout> | null = effectiveTimeout
+      ? setTimeout(() => controller.abort(), effectiveTimeout)
+      : null;
+
+    // fetching
+    try {
+      const response = await retryRequest(
+        () =>
+          fetch(finalUrl, {
+            ...(config as RequestInit),
             method: config.method,
             headers: config.headers,
-            body: this.prepareBody(config),
-            signal: config.signal ?? controller.signal
-        }), config.retries, config.retryDelay).then(async (res: Response) => {
-            
-            for (const interceptor of this.interceptors?.response?.successHandlers ?? []) {
-                res = await interceptor(res);
-            }
-            
-            let result: IResponse<T> = {
-                data: undefined as unknown as T,
-                status: res.status,
-                statusText: res.statusText,
-                headers: res.headers,
-            };
+            body: prepareBody(config),
+            signal: config.signal ?? signal,
+          }),
+        config.retries,
+        config.retryDelay,
+        config.retryOnStatus,
+      )
+        .then(async (res: Response) => {
+          const contentType = res.headers.get('Content-Type') || '';
 
-            const contenType = res.headers.get("Content-Type") || '';
+          if (!res.ok) {
+            const body = await parseBody(res, contentType);
+            throw new HttpError(res.statusText, res.status, body);
+          }
 
-            const wasModified = typeof (res as any).data !== "undefined";
-            
+          const data = await parseBody<T>(res, contentType);
 
-            if (!wasModified) {
-                let data = await this.parseBody<T>(res, contenType);
+          let result: IResponse<T> = {
+            ...res,
+            config,
+            data,
+          };
 
-                result = {
-                    data,
-                    status: res.status,
-                    statusText: res.statusText,
-                    headers: res.headers,
-                }
-            } else {
-                result.data = (res as any).data;
-            }
+          for (const interceptor of this.interceptors?.response
+            ?.successHandlers ?? []) {
+            result = (await interceptor(result)) as IResponse<T>;
+          }
 
-            return result;
-
-        }).catch(error => {
-            for (const interceptor of this.interceptors?.response.errorHandlers ?? []) {
-                interceptor(error);
-            }
-
-            throw error;
-        }).finally(() => {
-            if (timeoutId) clearTimeout(timeoutId);
+          return result;
         })
+        .catch(async (error) => {
+          for (const interceptor of this.interceptors?.response.errorHandlers ??
+            []) {
+            error = await interceptor(error);
+          }
+          throw error;
+        });
 
-        return response;
+      return response;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
-
-    private prepareBody(config: IRequestConfig): BodyInit | undefined {
-        if (!config.body) return undefined;
-
-        const contentType = config.headers?.get("Content-Type");
-
-        if (typeof config.body == 'string' || config.body instanceof FormData) {
-            return config.body;
-        }
-
-        if (contentType?.includes('application/json')) {
-            return JSON.stringify(config.body);
-        }
-
-        return config.body;
-    }
-
-    private async parseBody<T>(response: Response, contentType: string): Promise<T> {
-
-        if (contentType.includes("application/json")) {
-            return await response.json();
-        }
-
-        if (contentType.includes("text/")) {
-            return await response.text() as T;
-        }
-
-        if (contentType.includes("application/pdf") || contentType.includes("application/octet-stream")) {
-            return await response.blob() as T;
-        }
-
-        // fallback
-        return await response.text() as T;
-    }
-
+  }
 }

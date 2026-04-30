@@ -1,11 +1,11 @@
-export interface IRequestOptions {
-    body?: any;
-    headers?: Headers;
-    queryParams?: Record<string, string | number | boolean>;
-    responseType?: 'json' | 'text' | 'blob';
-    timeout?: number;
-    retries?: number;
-    retryDelay?: number;
-    params?: Record<string, string>
-    signal?: AbortSignal;
+export type QueryParamsType = string | number | boolean;
+
+export interface IRequestOptions extends RequestInit {
+  queryParams?: Record<string, QueryParamsType>;
+  responseType?: 'json' | 'text' | 'blob';
+  timeout?: number;
+  retries?: number;
+  retryDelay?: number;
+  retryOnStatus?: [];
+  meta?: object;
 }

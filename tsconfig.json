@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-   
     "target": "esnext" /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */,
     "lib": [
       "ES2020",
@@ -16,5 +15,5 @@
     "strict": true /* Enable all strict type-checking options. */,
     "skipLibCheck": true /* Skip type checking all .d.ts files. */
   },
-  "include": ["src"]
+  "include": ["src", "src/index.ts"]
 }

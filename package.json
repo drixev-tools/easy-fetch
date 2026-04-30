@@ -1,34 +1,53 @@
 {
   "name": "@fsad-labs/easy-fetch",
-  "author": "fullstack-ad",
-  "description": "Lightweight fetch wrapper with middleware support",
-  "keywords": ["fetch","middleware","http","typescript","api"],
+  "author": "@drixev",
+  "description": "Lightweight fetch wrapper with interceptors support",
+  "keywords": [
+    "fetch",
+    "middleware",
+    "http",
+    "typescript",
+    "api"
+  ],
+  "funding": "https://buymeacoffee.com/drixev",
   "license": "MIT",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/fsad-labs/easy-fetch"
   },
-  "version": "1.0.7",
+  "version": "1.0.8",
   "main": "dist/index.cjs",
   "module": "./dist/index.js",
-  "types":"dist/index.d.ts",
-  "exports":{
-    ".":{
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     }
   },
   "scripts": {
     "build": "tsup --clean",
-    "dev":"tsup src/index.ts --watch",
-    "check-size":"node check/check-gzip-size.js"
+    "dev": "tsup ./index.ts --watch",
+    "check-size": "node check/check-gzip-size.js",
+    "lint": "eslint src --ext .ts",
+    "format": "npx prettier --write .",
+    "test": "vitest run",
+    "test:coverage": "vitest"
   },
   "devDependencies": {
-    "eslint": "^9.31.0",
+    "@eslint/js": "^9.33.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
     "prettier": "^3.6.2",
     "tsup": "^8.5.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.40.0",
+    "vitest": "^3.2.4"
   }
 }

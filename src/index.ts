@@ -1,3 +1,4 @@
-export * from './easyFetch'
-export * from './createClient'
-export * from './client'
+export { EasyFetchError } from './handlers/easyFetchError.js';
+export * from './easyFetch.js';
+export * from './createClient.js';
+export * from './clients.js';

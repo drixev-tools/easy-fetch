@@ -17,6 +17,9 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run test:coverage
       - run: npm run build
       - run: npm run check-size
       - run: npm pack --dry-run

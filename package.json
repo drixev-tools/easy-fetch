@@ -1,6 +1,6 @@
 {
-  "name": "@fsad-labs/easy-fetch",
-  "author": "@drixev",
+  "name": "@drixev-tools/easy-fetch",
+  "author": "drixev",
   "description": "Lightweight fetch wrapper with interceptors support",
   "keywords": [
     "fetch",
@@ -9,7 +9,6 @@
     "typescript",
     "api"
   ],
-  "funding": "https://buymeacoffee.com/drixev",
   "license": "MIT",
   "files": [
     "dist"
@@ -17,7 +16,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fsad-labs/easy-fetch"
+    "url": "https://github.com/drixev-tools/easy-fetch"
   },
   "version": "1.0.8",
   "main": "dist/index.cjs",

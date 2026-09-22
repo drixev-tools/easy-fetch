@@ -5,6 +5,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-09-22
+
 ### Fixed
 
 - `EasyFetch#request()` no longer silently drops `status`, `statusText`,
@@ -71,4 +73,5 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   was being published in the tarball but never actually rendered by npm's
   registry (which reads `README.md`).
 
-[Unreleased]: https://github.com/drixev-tools/easy-fetch/compare/v1.0.8...HEAD
+[Unreleased]: https://github.com/drixev-tools/easy-fetch/compare/v1.0.9...HEAD
+[1.0.9]: https://github.com/drixev-tools/easy-fetch/compare/v1.0.8...v1.0.9

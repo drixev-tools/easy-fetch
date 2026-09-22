@@ -1,4 +1,4 @@
-import { IRequestConfig } from '../types';
+import { IRequestConfig } from '../types/index.js';
 
 export async function retryRequest<T>(
   fn: () => Promise<T>,
@@ -58,7 +58,20 @@ export function prepareBody(config: IRequestConfig): BodyInit | undefined {
 export async function parseBody<T>(
   response: Response,
   contentType: string,
+  responseType?: 'json' | 'text' | 'blob',
 ): Promise<T> {
+  if (responseType === 'json') {
+    return (await response.json()) as T;
+  }
+
+  if (responseType === 'text') {
+    return (await response.text()) as T;
+  }
+
+  if (responseType === 'blob') {
+    return (await response.blob()) as T;
+  }
+
   if (contentType.includes('application/json')) {
     return (await response.json()) as T;
   }

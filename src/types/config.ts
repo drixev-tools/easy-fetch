@@ -1,4 +1,4 @@
-import { IRequestOptions } from './request';
+import { IRequestOptions } from './request.js';
 
 export interface IEasyFetchOptions {
   baseUrl?: string;

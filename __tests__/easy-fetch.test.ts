@@ -56,6 +56,28 @@ describe('EasyFetch', () => {
     });
   });
 
+  it('should expose status/statusText/headers from a real Response instance', async () => {
+    // a real Response's status/statusText/headers are prototype getters, not
+    // own properties — spreading it (as opposed to reading each field) would
+    // silently drop them, so this must use `new Response(...)` rather than a
+    // plain mock object.
+    const mockData = { id: 1, name: 'Alice' };
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify(mockData), {
+        status: 201,
+        statusText: 'Created',
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const res = await client.request({ url: '/user/1', method: 'GET' });
+
+    expect(res.data).toEqual(mockData);
+    expect(res.status).toBe(201);
+    expect(res.statusText).toBe('Created');
+    expect(res.headers.get('content-type')).toBe('application/json');
+  });
+
   it('should parse text response', async () => {
     const mockText = 'hello world';
 
@@ -309,6 +331,54 @@ describe('EasyFetch', () => {
     });
   });
 
+  it('should still enforce timeout when a caller-provided signal is passed', async () => {
+    const client = new EasyFetch({ baseUrl: 'https://api.example.com' });
+    const externalController = new AbortController();
+
+    // mock fetch to reject only when its own signal aborts (never-resolving otherwise)
+    globalThis.fetch = vi.fn().mockImplementation((_, options) => {
+      return new Promise((_, reject) => {
+        options?.signal?.addEventListener('abort', () => {
+          reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+        });
+      });
+    });
+
+    const fetchPromise = client.request({
+      url: '/timeout',
+      method: 'GET',
+      timeout: 10,
+      signal: externalController.signal,
+    });
+
+    await expect(fetchPromise).rejects.toMatchObject({
+      message: 'Request timed out',
+      code: 'TIMEOUT_ERROR',
+    });
+  });
+
+  it('should honor responseType override regardless of Content-Type header', async () => {
+    const client = new EasyFetch({ baseUrl: 'https://api.example.com' });
+    const rawText = '{"id":1}';
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => rawText,
+      json: async () => JSON.parse(rawText),
+    } as unknown as Response);
+
+    const res = await client.request<string>({
+      url: '/forced-text',
+      method: 'GET',
+      responseType: 'text',
+    });
+
+    expect(res.data).toBe(rawText);
+  });
+
   it('should handle network error using error interceptor', async () => {
     globalThis.fetch = vi
       .fn()
@@ -340,6 +410,94 @@ describe('EasyFetch', () => {
     });
     expect(res.data.retry).toBe(true);
     expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('should retry when the response status is in retryOnStatus (default list)', async () => {
+    const jsonResponse = (status: number, body: unknown) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    const spy = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(502, { error: 'bad gateway' }))
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+
+    globalThis.fetch = spy;
+
+    const res = await client.request<{ ok: boolean }>({
+      url: '/gateway',
+      method: 'GET',
+      retries: 1,
+    });
+
+    expect(res.data.ok).toBe(true);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('should NOT retry when the response status is not in retryOnStatus', async () => {
+    const jsonResponse = (status: number, body: unknown) =>
+      new Response(JSON.stringify(body), {
+        status,
+        statusText: 'Bad Request',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    const spy = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(400, { error: 'bad request' }));
+
+    globalThis.fetch = spy;
+
+    await expect(
+      client.request({ url: '/bad-request', method: 'GET', retries: 2 }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should respect a custom retryOnStatus list', async () => {
+    const jsonResponse = (status: number, body: unknown) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    const spy = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(429, { error: 'rate limited' }))
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+
+    globalThis.fetch = spy;
+
+    const res = await client.request<{ ok: boolean }>({
+      url: '/rate-limited',
+      method: 'GET',
+      retries: 1,
+      retryOnStatus: [429],
+    });
+
+    expect(res.data.ok).toBe(true);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('should refuse to retry a request with a streamed body', async () => {
+    const spy = vi.fn();
+    globalThis.fetch = spy;
+
+    const stream = new ReadableStream();
+
+    await expect(
+      client.request({
+        url: '/upload',
+        method: 'POST',
+        retries: 1,
+        body: stream,
+      }),
+    ).rejects.toThrow('Cannot retry a request with a streamed body');
+
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 
@@ -405,8 +563,6 @@ describe('EasyFetch other cases', () => {
       json: async () => ({ ok: true }),
     } as Response);
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
     await client.request({ url: '/json', method: 'POST', body: { a: 1 } });
 
     const callHeaders = (globalThis.fetch as Mock).mock.calls[0][1].headers;

@@ -99,8 +99,6 @@ describe('createClient', () => {
       json: async () => ({ created: true }),
     } as unknown as Response);
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-errors
     const res = await client.post('/create', { body: { name: 'test' } });
     expect(res.data).toEqual({ created: true });
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -118,8 +116,6 @@ describe('createClient', () => {
       json: async () => ({ created: true }),
     } as unknown as Response);
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-errors
     const res = await client.put('/update', { body: { name: 'test' } });
     expect(res.data).toEqual({ created: true });
     expect(globalThis.fetch).toHaveBeenCalledWith(

@@ -1,7 +1,7 @@
-# @fsad-labs/easy-fetch
+# @drixev/easy-fetch
 
-[![npm version](https://img.shields.io/npm/v/@fsad-labs/easy-fetch.svg)](https://www.npmjs.com/package/@fsad-labs/easy-fetch)
-[![License](https://img.shields.io/npm/l/@fsad-labs/easy-fetch.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/@drixev/easy-fetch.svg)](https://www.npmjs.com/package/@drixev/easy-fetch)
+[![License](https://img.shields.io/npm/l/@drixev/easy-fetch.svg)](LICENSE)
 
 <DESCRIPTION>
 
@@ -18,7 +18,7 @@ A lightweight and flexible wrapper around the Fetch API that simplifies HTTP req
 ## Install
 
 ```bash
-npm i @fsad-labs/easy-fetch
+npm i @drixev/easy-fetch
 ```
 
 ## API Reference
@@ -114,7 +114,7 @@ You can use these different clients for make you fetch call API or create your o
 - Description: The default fetch wrapper with automatic JSON parsing, error handling and using interceptors.
 
 ```ts
-const { EasyFetch } = require('@fsad-labs/easy-fetch');
+const { EasyFetch } = require('@drixev/easy-fetch');
 
 const baseUrl = 'https://api.example.com';
 
@@ -184,14 +184,16 @@ easyFetch
 
 #### override default interceptors
 
-you can override the default interceptors using _setIntereptors_
+you can override the default interceptors using _setInterceptors_
 
 ```ts
 const easy = new EasyFetch({ baseUrl: 'https://api.example.com' });
-easy.setIntereptors({
+easy.setInterceptors({
   // New behavior for REQUEST - RESPONSE and ERROR interceptors
 });
 ```
+
+> `setIntereptors` (missing "c") still works as a deprecated alias for backwards compatibility, but new code should use `setInterceptors`.
 
 ### createClient
 
@@ -226,7 +228,7 @@ client
 
 #### override default interceptors using _createClient_ also
 
-you can override the default interceptors using _setIntereptors_, make sure you call this function before use _interceptors_ prop
+you can override the default interceptors using _setInterceptors_, make sure you call this function before use _interceptors_ prop
 
 ```ts
 client.setInterceptors({
@@ -257,45 +259,32 @@ client.setInterceptors({
 });
 ```
 
-### pre-defined clients
+### pre-defined clients (deprecated)
 
-#### easyFetchAuth
-
-Use this client to easily make authenticated requests.
-
-```ts
-conat easyAuth = easyFetchAuth(url, 'token123');
-
-easyAuth.get().then((result) => {
-    //TODO
-});
-
-```
-
-#### easyFetchWithHeaders
-
-- Description: Send requests with custom headers.
+`easyFetchAuth`, `easyFetchWithHeaders`, and `easyFetchWithTimeout` are
+single-option shortcuts around `createClient` — each only sets one config
+field. Prefer calling `createClient` directly, which supports the same
+options (and lets you combine them):
 
 ```ts
-const easyHeaders = easyFetchWithHeaders(url, {
-  'X-Custom': 'value',
+const client = createClient({
+  baseUrl: url,
+  token: 'token123', // auth
+  headers: { 'X-Custom': 'value' }, // custom headers
+  timeout: 2000, // timeout in ms
 });
 
-easyHeaders.get().then((result) => {
+client.get('/todos/1').then((result) => {
   //TODO
 });
 ```
 
-#### easyFetchWithTimeout
-
-- Description: Make requests with a timeout (milliseconds).
+The shortcuts still work but are kept only for backwards compatibility:
 
 ```ts
+const easyAuth = easyFetchAuth(url, 'token123');
+const easyHeaders = easyFetchWithHeaders(url, { 'X-Custom': 'value' });
 const easyTimeout = easyFetchWithTimeout(url, 2000);
-
-easyTimeout.get().then((result) => {
-  // TODO
-});
 ```
 
 ## Contributing
@@ -306,3 +295,15 @@ It keeps me energized and motivated to keep creating and improving.
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE) © [drixev](https://github.com/drixev)
+
+## Support ❤️
+
+I built this extension to help others and keep it free. If it adds value to
+your workflow, consider supporting it:
+
+- Star the repository
+- Share it with other developers
+- Send feedback and suggestions
+- [Buy me a coffee](https://buymeacoffee.com/drixev)
+- [GitHub Sponsors](https://github.com/sponsors/drixev)
+

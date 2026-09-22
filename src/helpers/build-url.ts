@@ -1,4 +1,4 @@
-import { QueryParamsType } from '../types';
+import { QueryParamsType } from '../types/index.js';
 
 export function buildUrl(
   baseUrl: string,

@@ -1,10 +1,10 @@
-import { EasyFetch } from './easyFetch';
+import { EasyFetch } from './easyFetch.js';
 import {
   IEasyFetchClient,
   IEasyFetchOptions,
   IInterceptors,
   IRequestConfig,
-} from './types';
+} from './types/index.js';
 
 export type clienType = IEasyFetchClient & {
   setInterceptors: (interceptors: IInterceptors) => void;
@@ -28,7 +28,7 @@ export function createClient(config: IEasyFetchOptions = {}): clienType {
     get interceptors() {
       return easyFetch.interceptors;
     },
-    setInterceptors: easyFetch.setIntereptors,
+    setInterceptors: easyFetch.setInterceptors.bind(easyFetch),
   };
 
   return client;

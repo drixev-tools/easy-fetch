@@ -1,4 +1,4 @@
-import { IRequestConfig } from './config';
+import { IRequestConfig } from './config.js';
 
 export interface IResponse<T = unknown> {
   data: T;

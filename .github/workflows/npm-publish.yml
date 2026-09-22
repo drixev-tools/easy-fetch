@@ -37,4 +37,4 @@ jobs:
       - run: npm run build
       - run: npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN_FSAD_LABS_EASY_FETCH}}
+          NODE_AUTH_TOKEN: ${{secrets.NPM_EASYFETCH}}

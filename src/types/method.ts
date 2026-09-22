@@ -1,5 +1,5 @@
-import { IRequestOptions } from './request';
-import { IResponse } from './response';
+import { IRequestOptions } from './request.js';
+import { IResponse } from './response.js';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 

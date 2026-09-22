@@ -8,7 +8,7 @@ import {
 } from '../src/clients';
 
 // 👇 mock createClient so we can verify its arguments
-vi.mock('./createClient', () => ({
+vi.mock('../src/createClient', () => ({
   createClient: vi.fn(() => ({ request: vi.fn() })),
 }));
 

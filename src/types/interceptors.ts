@@ -1,5 +1,5 @@
-import { IRequestConfig } from './config';
-import { IResponse } from './response';
+import { IRequestConfig } from './config.js';
+import { IResponse } from './response.js';
 
 export type RequestInterceptor = (
   config: IRequestConfig,

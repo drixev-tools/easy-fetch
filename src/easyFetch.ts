@@ -3,16 +3,16 @@ import {
   IInterceptors,
   IRequestConfig,
   IResponse,
-} from './types';
-import { parseBody, prepareBody, retryRequest } from './helpers';
-import { buildUrl } from './helpers/build-url';
+} from './types/index.js';
+import { parseBody, prepareBody, retryRequest } from './helpers/index.js';
+import { buildUrl } from './helpers/build-url.js';
 import {
   RequestInterceptor,
   ResponseSuccessInterceptor,
   ResponseErrorInterceptor,
-} from './types/interceptors';
-import { HttpError } from './handlers/httpError';
-import { EasyFetchError } from './handlers/easyFetchError';
+} from './types/interceptors.js';
+import { HttpError } from './handlers/httpError.js';
+import { EasyFetchError } from './handlers/easyFetchError.js';
 
 export class EasyFetch {
   private baseUrl?: string;
@@ -81,8 +81,13 @@ export class EasyFetch {
     };
   }
 
-  setIntereptors(interceptors: IInterceptors) {
+  setInterceptors(interceptors: IInterceptors) {
     Object.assign(this.interceptors, interceptors);
+  }
+
+  /** @deprecated Misspelled; use {@link EasyFetch.setInterceptors} instead. Kept for backwards compatibility. */
+  setIntereptors(interceptors: IInterceptors) {
+    this.setInterceptors(interceptors);
   }
 
   async request<T = unknown>(config: IRequestConfig): Promise<IResponse<T>> {
@@ -133,13 +138,36 @@ export class EasyFetch {
 
     // setup timeout and signal
     const controller = new AbortController();
-    const signal = controller.signal;
 
     const effectiveTimeout = config.timeout ?? this.timeout;
 
     const timeoutId: ReturnType<typeof setTimeout> | null = effectiveTimeout
       ? setTimeout(() => controller.abort(), effectiveTimeout)
       : null;
+
+    // forward an externally-provided signal into the internal controller
+    // so timeout and caller-driven cancellation can coexist
+    let onExternalAbort: (() => void) | undefined;
+    if (config.signal) {
+      if (config.signal.aborted) {
+        controller.abort();
+      } else {
+        onExternalAbort = () => controller.abort();
+        config.signal.addEventListener('abort', onExternalAbort, {
+          once: true,
+        });
+      }
+    }
+
+    // a streamed body is consumed by the first attempt and can't be
+    // replayed, so retrying it would silently send an empty/locked stream
+    if (
+      (config.retries ?? 0) > 0 &&
+      typeof ReadableStream !== 'undefined' &&
+      config.body instanceof ReadableStream
+    ) {
+      throw new Error('Cannot retry a request with a streamed body');
+    }
 
     // fetching
     try {
@@ -150,7 +178,7 @@ export class EasyFetch {
             method: config.method,
             headers: config.headers,
             body: prepareBody(config),
-            signal: config.signal ?? signal,
+            signal: controller.signal,
           }),
         config.retries,
         config.retryDelay,
@@ -160,14 +188,20 @@ export class EasyFetch {
           const contentType = res.headers.get('Content-Type') || '';
 
           if (!res.ok) {
-            const body = await parseBody(res, contentType);
+            const body = await parseBody(res, contentType, config.responseType);
             throw new HttpError(res.statusText, res.status, body);
           }
 
-          const data = await parseBody<T>(res, contentType);
+          const data = await parseBody<T>(
+            res,
+            contentType,
+            config.responseType,
+          );
 
           let result: IResponse<T> = {
-            ...res,
+            status: res.status,
+            statusText: res.statusText,
+            headers: res.headers,
             config,
             data,
           };
@@ -190,6 +224,9 @@ export class EasyFetch {
       return response;
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
+      if (onExternalAbort) {
+        config.signal?.removeEventListener('abort', onExternalAbort);
+      }
     }
   }
 }
